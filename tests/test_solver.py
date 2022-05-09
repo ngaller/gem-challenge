@@ -140,3 +140,77 @@ def test_solve_wind_simple():
         PlantConfiguration(name="gas1", p=40),
         PlantConfiguration(name="kerosine", p=0.0),
     ]
+
+
+def test_solve_wind_not_full_wind():
+    problem = Problem(
+        fuels={
+            "gas": Fuel(cost=1, factor=1),
+            "kerosine": Fuel(cost=2, factor=1),
+            "wind": Fuel(cost=0, factor=.8),
+        },
+        plants=[
+            Plant(name="kerosine", fuel_type="gas", efficiency=.3, pmin=10, pmax=100),
+            Plant(name="gas1", fuel_type="gas", efficiency=.43, pmin=5, pmax=100),
+            Plant(name="gas2", fuel_type="gas", efficiency=.58, pmin=10, pmax=100),
+            Plant(name="wind1", fuel_type="wind", efficiency=1, pmin=10, pmax=10),
+            Plant(name="wind2", fuel_type="wind", efficiency=1, pmin=10, pmax=10),
+        ],
+        load=15
+    )
+    solution = solve(problem)
+    assert solution == [
+        PlantConfiguration(name="wind1", p=8.0),
+        PlantConfiguration(name="wind2", p=0.0),
+        PlantConfiguration(name="gas2", p=0.0),
+        PlantConfiguration(name="gas1", p=7),
+        PlantConfiguration(name="kerosine", p=0.0),
+    ]
+
+
+def test_solve_wind_not_all_plants():
+    problem = Problem(
+        fuels={
+            "gas": Fuel(cost=1, factor=1),
+            "kerosine": Fuel(cost=2, factor=1),
+            "wind": Fuel(cost=0, factor=1),
+        },
+        plants=[
+            Plant(name="kerosine", fuel_type="gas", efficiency=.3, pmin=10, pmax=100),
+            Plant(name="gas1", fuel_type="gas", efficiency=.43, pmin=10, pmax=100),
+            Plant(name="gas2", fuel_type="gas", efficiency=.58, pmin=10, pmax=100),
+            Plant(name="wind1", fuel_type="wind", efficiency=1, pmin=10, pmax=10),
+            Plant(name="wind2", fuel_type="wind", efficiency=1, pmin=10, pmax=10),
+        ],
+        load=15
+    )
+    solution = solve(problem)
+    assert solution == [
+        PlantConfiguration(name="wind1", p=0.0),
+        PlantConfiguration(name="wind2", p=0.0),
+        PlantConfiguration(name="gas2", p=15),
+        PlantConfiguration(name="gas1", p=0.0),
+        PlantConfiguration(name="kerosine", p=0.0),
+    ]
+
+
+def test_solve_pathological_backtracking():
+    # in this test the instance that is least likely to be chosen (the kerosine fueled plant)
+    # ends up being the only suitable one, so a naive approach will fail to compute in time
+    # as it will have to explore every single solution
+    problem = Problem(
+        fuels={
+            "gas": Fuel(cost=1, factor=1),
+            "kerosine": Fuel(cost=2, factor=1),
+            "wind": Fuel(cost=0, factor=1),
+        },
+        plants=[
+                   Plant(name="kerosine", fuel_type="gas", efficiency=.3, pmin=10, pmax=100),
+                   Plant(name="wind1", fuel_type="wind", efficiency=1, pmin=10, pmax=10),
+               ] + [
+                   Plant(name="gas2", fuel_type="gas", efficiency=.58, pmin=20, pmax=100),
+               ] * 50,
+        load=15
+    )
+    solution = solve(problem)
+    assert solution[-1] == PlantConfiguration(name="kerosine", p=15)

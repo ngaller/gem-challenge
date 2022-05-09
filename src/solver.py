@@ -1,14 +1,16 @@
+import dataclasses
 import functools
-from typing import List, Dict
+from typing import List, Dict, Iterable
 
 from src.models import Problem, PlantConfiguration, Plant, Fuel
 
 
 def solve(problem: Problem) -> List[PlantConfiguration]:
-    plants = sorted(problem.plants, key=merit_order(problem.fuels))
-    solution = [0 for _ in plants]
+    plants = _calculate_effective_pminmax(problem.plants, problem.fuels)
+    plants = sorted(plants, key=merit_order(problem.fuels))
+    solution = Solution(plants)
     if _solve_dfs(problem.load, plants, solution):
-        powers = _calculate_powers(problem.load, plants, problem.fuels, solution)
+        powers = solution.calculate_powers(problem.load)
         return [
             PlantConfiguration(name=plant.name, p=power)
             for i, (plant, power) in enumerate(zip(plants, powers))
@@ -16,47 +18,74 @@ def solve(problem: Problem) -> List[PlantConfiguration]:
     raise ValueError("no solution")
 
 
-def _calculate_powers(load: float, plants: List[Plant], fuels: Dict[str, Fuel], solution):
-    # we know the plants are sorted in reverse cost / MW, so we need to turn the lowest ones to the max, if the
-    # solution determined that they needed to be switched on
-    configuration = [0.0 for _ in plants]
-    power = 0
-    for i, (p, s) in enumerate(zip(plants, solution)):
-        if not s:
-            continue
-        pmax = p.pmax * fuels[p.fuel_type].factor
-        if power + p.pmax < load:
-            configuration[i] = pmax
-            power += p.pmax
-        else:
-            configuration[i] = load - power
-            return configuration
-    raise AssertionError("solution was not valid!")
+class Solution:
+    def __init__(self, plants: List[Plant]):
+        self.pmin = 0
+        self.pmax = 0
+        self.status = [False for _ in plants]
+        self.plants = plants
+
+    def add(self, i):
+        self.status[i] = True
+        self.pmin += self.plants[i].pmin
+        self.pmax += self.plants[i].pmax
+
+    def remove(self, i):
+        self.status[i] = False
+        self.pmin -= self.plants[i].pmin
+        self.pmax -= self.plants[i].pmax
+
+    def is_solution(self, load: float):
+        return self.pmin <= load <= self.pmax
+
+    def can_solve(self, load: float):
+        return self.pmin <= load
+
+    def calculate_powers(self, load: float):
+        """Use the calculated solution to return the power output per plant to reach the load"""
+        # we know the plants are sorted in reverse cost / MW, so we need to turn the lowest ones to the max, if the
+        # solution determined that they needed to be switched on
+        configuration = [0.0 for _ in self.plants]
+        power = 0
+        for i, (p, s) in enumerate(zip(self.plants, self.status)):
+            if not s:
+                continue
+            if power + p.pmax < load:
+                configuration[i] = p.pmax
+                power += p.pmax
+            else:
+                configuration[i] = load - power
+                return configuration
+        raise AssertionError("solution was not valid!")
 
 
-def _solve_dfs(load, plants, solution, i=0):
+def _calculate_effective_pminmax(plants: List[Plant], fuels: Dict[str, Fuel]) -> Iterable[Plant]:
+    return [
+        dataclasses.replace(p,
+                            pmin=p.pmin * fuels[p.fuel_type].factor,
+                            pmax=p.pmax * fuels[p.fuel_type].factor)
+        for p in plants
+    ]
+
+
+def _solve_dfs(load, plants, solution: Solution, i=0):
     # consider the solution space as a tree, sorted by cost / MW (the nodes on the higher branches have the highest
     # cost) so we want to turn on the plants represented by nodes on the lowest branch first, and only turn them off if
     # this does not yield a solution.
-    if i == len(solution):
-        return _is_valid_solution(load, plants, solution)
+    if i == len(plants):
+        return solution.is_solution(load)
+    if not solution.can_solve(load):
+        # shortcut if the solution is not possible
+        return False
     # start exploring the right branch, since it is cheaper
-    solution[i] = 1
+    solution.add(i)
     if _solve_dfs(load, plants, solution, i + 1):
         return True
     # ok, didn't work, start exploring the left branch
-    solution[i] = 0
+    solution.remove(i)
     if _solve_dfs(load, plants, solution, i + 1):
         return True
     return False
-
-
-def _is_valid_solution(load, plants, solution):
-    # can we reach the load with the current configuration?
-    # TODO take fuel factor into account (for wind)
-    pmin = sum(p.pmin * s for (p, s) in zip(plants, solution))
-    pmax = sum(p.pmax * s for (p, s) in zip(plants, solution))
-    return pmin <= load <= pmax
 
 
 def merit_order(fuels: Dict[str, Fuel]):

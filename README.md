@@ -28,7 +28,11 @@ Install requirements using:
 
 Submit a sample payload using:
 
+    curl -X POST localhost:8888 -d @payload1.json --header "Content-Type: application/json"
+
 Access generated API documentation using:
+
+    http://localhost:8888/docs
 
 ### Running the Tests
 

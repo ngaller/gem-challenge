@@ -1,5 +1,7 @@
-from dataclasses import dataclass
+from pydantic.dataclasses import dataclass
 from typing import List, Dict
+
+from powerplant.base_models import PlantBase
 
 
 @dataclass
@@ -11,21 +13,16 @@ class Fuel:
 
 
 @dataclass
-class Plant:
-    name: str
+class Plant(PlantBase):
     # refers to Fuel.type
     fuel_type: str
-    # 1 for wind
-    efficiency: float = 1
-    pmin: float = 0
-    pmax: float = 0
 
 
 @dataclass
 class Problem:
     load: float
     fuels: Dict[str, Fuel]
-    plants: List[Plant]
+    powerplants: List[Plant]
 
 
 @dataclass

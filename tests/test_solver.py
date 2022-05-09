@@ -1,13 +1,14 @@
-from src.models import Problem, Plant, Fuel, PlantConfiguration
-from src.solver import solve, merit_order
+import pytest
+from powerplant.models import Problem, Plant, Fuel, PlantConfiguration
+from powerplant.solver import solve, merit_order
 
 
 def test_sort_merit_order():
     plants = [
-        Plant(name="1", fuel_type="gas", efficiency=.43),
-        Plant(name="4", fuel_type="gas", efficiency=.5),
-        Plant(name="3", fuel_type="kerosine", efficiency=.3),
-        Plant(name="2", fuel_type="wind", efficiency=1),
+        Plant(name="1", fuel_type="gas", efficiency=.43, pmax=0, pmin=0),
+        Plant(name="4", fuel_type="gas", efficiency=.5, pmax=0, pmin=0),
+        Plant(name="3", fuel_type="kerosine", efficiency=.3, pmax=0, pmin=0),
+        Plant(name="2", fuel_type="wind", efficiency=1, pmax=0, pmin=0),
     ]
     fuels = {
         "wind": Fuel(cost=0, factor=.5),
@@ -23,7 +24,7 @@ def test_solve_trivial():
         fuels={
             "gas": Fuel(cost=1, factor=1)
         },
-        plants=[
+        powerplants=[
             Plant(name="gas1", fuel_type="gas", efficiency=.5, pmin=10, pmax=100)
         ],
         load=100
@@ -39,7 +40,7 @@ def test_solve_2_gas_plants():
         fuels={
             "gas": Fuel(cost=1, factor=1)
         },
-        plants=[
+        powerplants=[
             Plant(name="gas1", fuel_type="gas", efficiency=.48, pmin=10, pmax=100),
             Plant(name="gas2", fuel_type="gas", efficiency=.53, pmin=10, pmax=100)
         ],
@@ -59,7 +60,7 @@ def test_solve_2_fuels():
             "kerosine": Fuel(cost=2, factor=1),
             "wind": Fuel(cost=0, factor=.5),
         },
-        plants=[
+        powerplants=[
             Plant(name="kerosine", fuel_type="gas", efficiency=.3, pmin=10, pmax=100),
             Plant(name="gas1", fuel_type="gas", efficiency=.43, pmin=10, pmax=100),
             Plant(name="gas2", fuel_type="gas", efficiency=.58, pmin=10, pmax=100),
@@ -81,7 +82,7 @@ def test_solve_2_plants():
             "kerosine": Fuel(cost=2, factor=1),
             "wind": Fuel(cost=0, factor=.5),
         },
-        plants=[
+        powerplants=[
             Plant(name="kerosine", fuel_type="gas", efficiency=.3, pmin=10, pmax=100),
             Plant(name="gas1", fuel_type="gas", efficiency=.43, pmin=10, pmax=100),
             Plant(name="gas2", fuel_type="gas", efficiency=.58, pmin=10, pmax=100),
@@ -103,7 +104,7 @@ def test_solve_2_plants_not_max_power():
             "kerosine": Fuel(cost=2, factor=1),
             "wind": Fuel(cost=0, factor=.5),
         },
-        plants=[
+        powerplants=[
             Plant(name="kerosine", fuel_type="gas", efficiency=.3, pmin=10, pmax=100),
             Plant(name="gas1", fuel_type="gas", efficiency=.43, pmin=10, pmax=100),
             Plant(name="gas2", fuel_type="gas", efficiency=.58, pmin=10, pmax=100),
@@ -125,7 +126,7 @@ def test_solve_wind_simple():
             "kerosine": Fuel(cost=2, factor=1),
             "wind": Fuel(cost=0, factor=1),
         },
-        plants=[
+        powerplants=[
             Plant(name="kerosine", fuel_type="gas", efficiency=.3, pmin=10, pmax=100),
             Plant(name="gas1", fuel_type="gas", efficiency=.43, pmin=10, pmax=100),
             Plant(name="gas2", fuel_type="gas", efficiency=.58, pmin=10, pmax=100),
@@ -149,7 +150,7 @@ def test_solve_wind_not_full_wind():
             "kerosine": Fuel(cost=2, factor=1),
             "wind": Fuel(cost=0, factor=.8),
         },
-        plants=[
+        powerplants=[
             Plant(name="kerosine", fuel_type="gas", efficiency=.3, pmin=10, pmax=100),
             Plant(name="gas1", fuel_type="gas", efficiency=.43, pmin=5, pmax=100),
             Plant(name="gas2", fuel_type="gas", efficiency=.58, pmin=10, pmax=100),
@@ -175,7 +176,7 @@ def test_solve_wind_not_all_plants():
             "kerosine": Fuel(cost=2, factor=1),
             "wind": Fuel(cost=0, factor=1),
         },
-        plants=[
+        powerplants=[
             Plant(name="kerosine", fuel_type="gas", efficiency=.3, pmin=10, pmax=100),
             Plant(name="gas1", fuel_type="gas", efficiency=.43, pmin=10, pmax=100),
             Plant(name="gas2", fuel_type="gas", efficiency=.58, pmin=10, pmax=100),
@@ -204,7 +205,7 @@ def test_solve_pathological_backtracking():
             "kerosine": Fuel(cost=2, factor=1),
             "wind": Fuel(cost=0, factor=1),
         },
-        plants=[
+        powerplants=[
                    Plant(name="kerosine", fuel_type="gas", efficiency=.3, pmin=10, pmax=100),
                    Plant(name="wind1", fuel_type="wind", efficiency=1, pmin=10, pmax=10),
                ] + [
@@ -214,3 +215,19 @@ def test_solve_pathological_backtracking():
     )
     solution = solve(problem)
     assert solution[-1] == PlantConfiguration(name="kerosine", p=15)
+
+
+def test_solve_not_possible():
+    problem = Problem(
+        fuels={
+            "gas": Fuel(cost=1, factor=1),
+            "wind": Fuel(cost=0, factor=1),
+        },
+        powerplants=[
+            Plant(name="wind", fuel_type="wind", efficiency=1, pmin=20, pmax=20),
+            Plant(name="gas1", fuel_type="gas", efficiency=.43, pmin=50, pmax=100),
+        ],
+        load=15
+    )
+    with pytest.raises(ValueError):
+        solve(problem)

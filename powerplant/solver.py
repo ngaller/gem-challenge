@@ -2,11 +2,11 @@ import dataclasses
 import functools
 from typing import List, Dict, Iterable
 
-from src.models import Problem, PlantConfiguration, Plant, Fuel
+from powerplant.models import Problem, PlantConfiguration, Plant, Fuel
 
 
 def solve(problem: Problem) -> List[PlantConfiguration]:
-    plants = _calculate_effective_pminmax(problem.plants, problem.fuels)
+    plants = _calculate_effective_pminmax(problem.powerplants, problem.fuels)
     plants = sorted(plants, key=merit_order(problem.fuels))
     solution = Solution(plants)
     if _solve_dfs(problem.load, plants, solution):
@@ -60,12 +60,15 @@ class Solution:
 
 
 def _calculate_effective_pminmax(plants: List[Plant], fuels: Dict[str, Fuel]) -> Iterable[Plant]:
-    return [
-        dataclasses.replace(p,
-                            pmin=p.pmin * fuels[p.fuel_type].factor,
-                            pmax=p.pmax * fuels[p.fuel_type].factor)
-        for p in plants
-    ]
+    """Corrections to the pmin / pmax of each plant according to fuel factor"""
+    for p in plants:
+        calculated = dataclasses.replace(p,
+                                         pmin=p.pmin * fuels[p.fuel_type].factor,
+                                         pmax=p.pmax * fuels[p.fuel_type].factor)
+        if p.fuel_type == "wind":
+            # for wind we consider they always output their pmax when they are switched on
+            calculated.pmin = calculated.pmax
+        yield calculated
 
 
 def _solve_dfs(load, plants, solution: Solution, i=0):

@@ -7,6 +7,9 @@ authors = ["Nicolas Galler <ngaller@gmail.com>"]
 [tool.poetry.dependencies]
 python = "^3.8"
 pytest = "^7.1.2"
+fastapi = "^0.76.0"
+uvicorn = "^0.17.6"
+pydantic = "^1.9.0"
 
 [tool.poetry.dev-dependencies]
 

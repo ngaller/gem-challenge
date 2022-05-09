@@ -1,8 +1,7 @@
-from pydantic.dataclasses import dataclass
+from pydantic import BaseModel
 
 
-@dataclass
-class PlantBase:
+class PlantBase(BaseModel):
     name: str
     # 1 for wind
     efficiency: float

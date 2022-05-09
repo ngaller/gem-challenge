@@ -11,9 +11,11 @@ RUN poetry export -f requirements.txt --without-hashes > requirements.txt
 # Final image
 FROM python:3.8-slim
 WORKDIR /app
-COPY --from=requirements-stage /packages/requirements.txt .
-RUN pip install --no-input --no-cache-dir -r requirements.txt
-COPY src/ /app
+COPY --from=requirements-stage /packages/requirements.txt /app
+RUN pip install --no-input --no-cache-dir -r /app/requirements.txt
+RUN mkdir powerplant
+COPY powerplant/ /app/powerplant/
 
 # TODO command
 # install gunicorn?
+CMD ["/usr/local/bin/uvicorn", "--host", "0.0.0.0", "powerplant.app:app"]

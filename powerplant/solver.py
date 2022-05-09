@@ -1,7 +1,7 @@
-import dataclasses
 import functools
 from typing import List, Dict, Iterable
 
+from powerplant.exceptions import NoSolutionException
 from powerplant.models import Problem, PlantConfiguration, Plant, Fuel
 
 
@@ -15,7 +15,7 @@ def solve(problem: Problem) -> List[PlantConfiguration]:
             PlantConfiguration(name=plant.name, p=power)
             for i, (plant, power) in enumerate(zip(plants, powers))
         ]
-    raise ValueError("no solution")
+    raise NoSolutionException("no solution")
 
 
 class Solution:
@@ -51,10 +51,10 @@ class Solution:
             if not s:
                 continue
             if power + p.pmax < load:
-                configuration[i] = p.pmax
-                power += p.pmax
+                configuration[i] = round(p.pmax, 1)
+                power += configuration[i]
             else:
-                configuration[i] = load - power
+                configuration[i] = round(load - power, 1)
                 return configuration
         raise AssertionError("solution was not valid!")
 
@@ -62,9 +62,8 @@ class Solution:
 def _calculate_effective_pminmax(plants: List[Plant], fuels: Dict[str, Fuel]) -> Iterable[Plant]:
     """Corrections to the pmin / pmax of each plant according to fuel factor"""
     for p in plants:
-        calculated = dataclasses.replace(p,
-                                         pmin=p.pmin * fuels[p.fuel_type].factor,
-                                         pmax=p.pmax * fuels[p.fuel_type].factor)
+        calculated = p.copy(update={'pmin': round(p.pmin * fuels[p.fuel_type].factor, 1),
+                                    'pmax': round(p.pmax * fuels[p.fuel_type].factor, 1)})
         if p.fuel_type == "wind":
             # for wind we consider they always output their pmax when they are switched on
             calculated.pmin = calculated.pmax
